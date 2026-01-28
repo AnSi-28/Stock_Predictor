@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Prediction Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1f4037, #99f2c8);
+            color: white;
+        }
+
+        .card {
+            width: 75%;
+            margin: 40px auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0px 10px 25px rgba(0,0,0,0.3);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        select, input, button {
+            padding: 8px 12px;
+            margin: 10px;
+            border-radius: 6px;
+            border: none;
+        }
+
+        button {
+            background: #00c9a7;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #00a186;
+        }
+
+        canvas {
+            background: white;
+            border-radius: 10px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2 id="title">Stock Price Prediction</h2>
+
+    <div class="controls">
+        <select id="model">
+            <option value="lstm">LSTM</option>
+            <option value="lr">Linear Regression</option>
+        </select>
+
+        <input type="number" id="days" min="1" max="15" value="5">
+
+        <button onclick="predict()">Predict</button>
+    </div>
+
+    <canvas id="predictionChart"></canvas>
+</div>
+
+<script>
+let chart;
+
+function predict() {
+    const model = document.getElementById("model").value;
+    const days = document.getElementById("days").value;
+
+    fetch(`/predict?model=${model}&days=${days}`)
+        .then(response => response.json())
+        .then(data => {
+
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+
+            document.getElementById("title").innerText =
+                `${data.stock} Prediction using ${data.model.toUpperCase()}`;
+
+            const historicalLabels = data.historical.map((_, i) => "Past " + (30-i));
+            const futureLabels = Array.from({length: data.days}, (_, i) => "Future " + (i+1));
+
+            const allLabels = historicalLabels.concat(futureLabels);
+
+            const combinedData =
+                data.historical.concat(data.predictions);
+
+            if (chart) chart.destroy();
+
+            const ctx = document.getElementById("predictionChart").getContext("2d");
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allLabels,
+                    datasets: [
+                        {
+                            label: "Historical Prices",
+                            data: data.historical,
+                            borderColor: "#4facfe",
+                            fill: false,
+                            tension: 0.3
+                        },
+                        {
+                            label: "Predicted Prices",
+                            data: Array(30).fill(null).concat(data.predictions),
+                            borderColor: "#ff6a00",
+                            borderDash: [5,5],
+                            fill: false,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return "₹ " + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+        })
+        .catch(error => {
+            console.error(error);
+            alert("Error fetching prediction");
+        });
+}
+</script>
+
+</body>
+</html>
